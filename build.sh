@@ -13,17 +13,23 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source poky/oe-init-build-env
 
 # The layers that need to be added to the build
-declare -A layers; declare -A layer_paths
-layers+=("meta-raspberrypi"); layer_paths+=("$SCRIPT_DIR/meta-raspberrypi")
-layers+=("meta-oe"); layer_paths+=("$SCRIPT_DIR/meta-openembedded/meta-oe")
-layers+=("meta-python"); layer_paths+=("$SCRIPT_DIR/meta-openembedded/meta-python")
-layers+=("meta-networking"); layer_paths+=("$SCRIPT_DIR/meta-openembedded/meta-networking")
-layers+=("meta-multimedia"); layer_paths+=("$SCRIPT_DIR/meta-openembedded/meta-multimedia")
-# layers["meta-raspberrypi"]=$SCRIPT_DIR/meta-raspberrypi
-# layers["meta-oe"]=$SCRIPT_DIR/meta-openembedded/meta-oe
-# layers["meta-python"]=$SCRIPT_DIR/meta-openembedded/meta-python
-# layers["meta-networking"]=$SCRIPT_DIR/meta-openembedded/meta-networking
-# layers["meta-multimedia"]=$SCRIPT_DIR/meta-openembedded/meta-multimedia
+# LAYER_NAMES and LAYER_PATHS are associated. You need to change or update both
+# arrays when adding new layers to the build
+LAYER_NAMES=(
+    "meta-raspberrypi"
+    "meta-oe"
+    "meta-python"
+    "meta-networking"
+    "meta-multimedia"
+)
+
+LAYER_PATHS=(
+    "$SCRIPT_DIR/meta-raspberrypi"
+    "$SCRIPT_DIR/meta-openembedded/meta-oe"
+    "$SCRIPT_DIR/meta-openembedded/meta-python"
+    "$SCRIPT_DIR/meta-openembedded/meta-networking"
+    "$SCRIPT_DIR/meta-openembedded/meta-multimedia"
+)
 
 CONFLINE="MACHINE = \"raspberrypi4-64\""
 
@@ -42,17 +48,20 @@ else
 fi
 
 # add any layers that haven't already been added
-for i in "${!layers[@]}"
-do
-    bitbake-layers show-layers | grep "${layers[$i]}" > /dev/null
+for i in "${!LAYER_NAMES[@]}"; do
+    layer="${LAYER_NAMES[$i]}"
+    layer_path="${LAYER_PATHS[$i]}"
+    echo "Working on layer $layer, value: $layer_path"
+    bitbake-layers show-layers | grep "$layer" > /dev/null
     layer_info=$?
 
     if [ $layer_info -ne 0 ];then
-    	echo "Adding $i layer"
-    	bitbake-layers add-layer ${layer_paths[$i]}
+    	echo "Adding $i layer at path: $layer_path"
+    	bitbake-layers add-layer $layer_path
     else
-    	echo "${layers[$i]} layer already exists"
+    	echo "$layer layer already exists"
     fi
+    ((idx++))
 done
 
 set -e
