@@ -1,4 +1,4 @@
-name: assignment-test
+name: final-project-build
 on:
     push:
         tags-ignore:
@@ -9,7 +9,7 @@ jobs:
       build:
         runs-on: self-hosted
         steps:
-          - uses: actions/checkout@v3
+          - uses: actions/checkout@v4
             with:
               clean: false
               submodules: 'recursive'
