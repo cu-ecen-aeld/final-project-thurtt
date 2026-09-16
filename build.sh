@@ -69,4 +69,4 @@ for i in "${!LAYER_NAMES[@]}"; do
 done
 
 set -e
-bitbake core-image-base
+bitbake meshtasticd
