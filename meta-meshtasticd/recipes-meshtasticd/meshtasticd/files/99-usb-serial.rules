@@ -1,0 +1,9 @@
+# Note: The LoRA hat and the GPS module both have the same vid:pid AND serial number
+#       The only other option is to pin the devices to specific USB ports, which is
+#       less than ideal. If the devices are ever plugged into different ports, these
+#       mappings will break
+# Assign ttyLORA to the specific physical USB port
+SUBSYSTEM=="tty", ENV{ID_PATH}=="platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.4:1.0", SYMLINK+="ttyLORA", MODE="0666", GROUP="dialout"
+
+# Assign ttyGPS to the other physical USB port
+SUBSYSTEM=="tty", ENV{ID_PATH}=="platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.3:1.0", SYMLINK+="ttyGPS", MODE="0666", GROUP="dialout"

@@ -1,0 +1,10 @@
+Lora:
+  Module: "SX1262"
+  Port: "/dev/ttyLORA"
+  BaudRate: 115200
+
+  # Set pin overrides to -1 so Portduino does not attempt native GPIO access
+  DIO1_Pin: -1
+  BUSY_Pin: -1
+  RESET_Pin: -1
+  CS_Pin: -1
