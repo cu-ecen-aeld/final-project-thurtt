@@ -21,6 +21,8 @@ LAYER_NAMES=(
     "meta-python"
     "meta-networking"
     "meta-multimedia"
+    "meta-meshtasticd"
+
 )
 
 LAYER_PATHS=(
@@ -29,6 +31,8 @@ LAYER_PATHS=(
     "$SCRIPT_DIR/meta-openembedded/meta-python"
     "$SCRIPT_DIR/meta-openembedded/meta-networking"
     "$SCRIPT_DIR/meta-openembedded/meta-multimedia"
+    "$SCRIPT_DIR/meta-meshtasticd"
+
 )
 
 CONFLINE="MACHINE = \"raspberrypi4-64\""
@@ -65,4 +69,4 @@ for i in "${!LAYER_NAMES[@]}"; do
 done
 
 set -e
-bitbake core-image-base
+bitbake meshtasticd-image
