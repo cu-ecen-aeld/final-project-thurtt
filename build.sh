@@ -21,6 +21,7 @@ LAYER_NAMES=(
     "meta-python"
     "meta-networking"
     "meta-multimedia"
+    "meta-custom"
     "meta-meshtasticd"
 
 )
@@ -31,8 +32,8 @@ LAYER_PATHS=(
     "$SCRIPT_DIR/meta-openembedded/meta-python"
     "$SCRIPT_DIR/meta-openembedded/meta-networking"
     "$SCRIPT_DIR/meta-openembedded/meta-multimedia"
+    "$SCRIPT_DIR/meta-custom"
     "$SCRIPT_DIR/meta-meshtasticd"
-
 )
 
 CONFLINE="MACHINE = \"raspberrypi4-64\""
