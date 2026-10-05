@@ -1,0 +1,2 @@
+# Grant the i2c group access to I2C bus devices
+SUBSYSTEM=="i2c-dev", GROUP="i2c", MODE="0660"

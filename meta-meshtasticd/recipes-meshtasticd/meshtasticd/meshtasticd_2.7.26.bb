@@ -52,20 +52,21 @@ RDEPENDS:${PN} += " \
     libmicrohttpd \
     gnutls \
     jansson \
+    mesh-statusd \
 "
 
-# Systemd configuration
-SYSTEMD_SERVICE:${PN} = "meshtasticd.service"
+inherit systemd
+
+SYSTEMD_SERVICE:${PN} = "meshtasticd.service configure_radio.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
-FILES:${PN} += "${systemd_unitdir}/system/meshtasticd.service"
 
 # Add users
 inherit useradd
 
 USERADD_PACKAGES = "${PN}"
 
-GROUPADD_PARAM:${PN} = "--system gpio; --system spi"
-USERADD_PARAM:${PN} = "--system --create-home --groups gpio,spi --user-group meshtasticd"
+GROUPADD_PARAM:${PN} = "--system gpio; --system spi; --system i2c; --system dialout"
+USERADD_PARAM:${PN} = "--system --create-home --groups gpio,spi,i2c,dialout --user-group meshtasticd"
 
 CFLAGS:remove = "-fcanon-prefix-map"
 CXXFLAGS:remove = "-fcanon-prefix-map"
@@ -74,7 +75,7 @@ CXXFLAGS:prepend = " -isystem ${STAGING_INCDIR}/c++/13.4.0 -isystem ${STAGING_IN
 
 # Add in our build patch. This is necessary because
 # platformio isn't picking up some of the yocto linker path locations
-SRC_URI += "file://yocto-link-fix.py file://config.yaml file://98-gpio-pin.rules file://99-usb-serial.rules"
+SRC_URI += "file://yocto-link-fix.py file://config.yaml file://98-gpio-pin.rules file://99-usb-serial.rules file://99-i2c.rules file://configure_radio.sh file://configure_radio.service"
 
 do_configure:append() {
     # Due to the way that platformio assembles the linker parameters, we need this hack
@@ -103,7 +104,6 @@ do_compile () {
     export PLATFORMIO_BUILD_CACHE_DIR="${WORKDIR}/.platformio_build_cache"
 
     export PLATFORMIO_BUILD_FLAGS="--sysroot=${STAGING_DIR_TARGET} ${CXXFLAGS} ${CFLAGS} -I${STAGING_INCDIR} ${LDFLAGS} -L${STAGING_LIBDIR} -L${STAGING_DIR_TARGET}/lib -B${STAGING_LIBDIR}/${TARGET_SYS}/13.4.0"
-    export LDFLAGS="--sysroot=${STAGING_DIR_TARGET} ${LDFLAGS} -L${STAGING_LIBDIR}"
 
     # There's no yocto environment available in the meshtasticd build system,
     # but we can use the buildroot environment and the path hackery above to
@@ -123,6 +123,9 @@ do_install () {
     install -D -m 0755 ${S}/.pio/build/buildroot/meshtasticd ${D}${bindir}/meshtasticd
     install -D -m 0755 ${S}/bin/meshtasticd-start.sh ${D}${bindir}/meshtasticd-start.sh
 
+    # Install the radio configuration script
+    install -D -m 0755 ${WORKDIR}/configure_radio.sh ${D}${bindir}/configure_radio.sh
+
     # Install configuration files
     install -D -m 0644 ${WORKDIR}/config.yaml ${D}${sysconfdir}/meshtasticd/config.yaml
     install -d ${D}${sysconfdir}/meshtasticd/available.d
@@ -138,11 +141,13 @@ do_install () {
     # If you are using systemd, you might also install a service file:
     install -d ${D}${systemd_unitdir}/system
     install -D -m 0644 ${S}/bin/meshtasticd.service ${D}${systemd_unitdir}/system/meshtasticd.service
+    install -D -m 0644 ${WORKDIR}/configure_radio.service ${D}${systemd_unitdir}/system/configure_radio.service
 
     # Install the device udev rules
     install -d ${D}/etc/udev/rules.d
     install -D -m 0644 ${WORKDIR}/99-usb-serial.rules ${D}/etc/udev/rules.d/99-usb-serial.rules
     install -D -m 0644 ${WORKDIR}/98-gpio-pin.rules ${D}/etc/udev/rules.d/98-gpio-pin.rules
+    install -D -m 0644 ${WORKDIR}/99-i2c.rules ${D}/etc/udev/rules.d/99-i2c.rules
 
     # Web UI assets
     install -m 0775 -o root -g meshtasticd -d ${D}${sysconfdir}/meshtasticd/ssl

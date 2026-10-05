@@ -110,12 +110,12 @@ GPS:
 
 ### Specify I2C device, or leave blank for none
 
-I2C:
-  I2CDevice: /dev/i2c-1
+#I2C:
+#  I2CDevice: /dev/i2c-1
 
 ### Set up SPI displays here. Note that I2C displays are generally auto-detected.
 
-Display:
+#Display:
 
 ### Adafruit PiTFT 2.8 TFT+Touchscreen
 #  Panel: ILI9341
