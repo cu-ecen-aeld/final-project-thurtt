@@ -1,0 +1,14 @@
+[Unit]
+Description=One time configuration of the LoRa radio
+After=network-online.target meshtasticd.service
+Wants=meshtasticd.service
+ConditionPathExists=!/var/lib/configure_radio.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/configure_radio.sh
+ExecStartPost=/usr/bin/touch /var/lib/configure_radio.done
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

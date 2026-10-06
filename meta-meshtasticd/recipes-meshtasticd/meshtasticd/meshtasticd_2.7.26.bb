@@ -6,6 +6,7 @@
 ###############################################################################
 
 inherit python3native
+inherit systemd
 
 SUMMARY = "meshtasticd firmware daemon"
 DESCRIPTION = "meshtasticd is the firmware daemon for Meshtastic"
@@ -17,19 +18,24 @@ SRC_URI = "gitsm://github.com/meshtastic/firmware;protocol=https;branch=2.7"
 SRC_URI[sha256sum] = "3977fb33d30835f4fcde290a5ef88d00affca2a5dcf5415555adff3e3b39336a"
 SRCREV = "54e0d8d0ab2ff56b3a9ce967e53f79e49af560fb"
 
+# Download the web ui source. This is handy for configuring the radio
+SRC_URI += "https://github.com/meshtastic/web/releases/download/v2.7.1/build.tar;name=webui;unpack=0"
+SRC_URI[webui.sha256sum] = "dfb36b72f092d6e8cd0f202c0c4c01c4742dd3feb49758c574727f251299dbfe"
+
 # platformio insists on downloading packages during the compiliation process
 do_compile[network] = "1"
 
 # Where to find the source once fetched
 S = "${WORKDIR}/git"
 
-DEPENDS += "\
+DEPENDS += " \
     pkgconf \
     zlib \
     openssl-native \
     python3-native \
     python3-platformio-native \
-    libgpiod yaml-cpp bluez5 i2c-tools libusb1 libbsd libuv\
+    libgpiod yaml-cpp bluez5 i2c-tools libusb1 libbsd libuv \
+    orcania yder ulfius libmicrohttpd gnutls jansson \
 "
 
 RDEPENDS:${PN} += " \
@@ -40,13 +46,27 @@ RDEPENDS:${PN} += " \
     bluez5 \
     i2c-tools \
     libusb1 \
+    orcania \
+    yder \
+    ulfius \
+    libmicrohttpd \
+    gnutls \
+    jansson \
+    mesh-statusd \
 "
 
-# Systemd configuration
-SYSTEMD_SERVICE:${PN} = "meshtasticd.service"
-SYSTEMD_AUTO_ENABLE:${PN} = "enable"
-FILES:${PN} += "${systemd_unitdir}/system/meshtasticd.service"
+inherit systemd
 
+SYSTEMD_SERVICE:${PN} = "meshtasticd.service configure_radio.service"
+SYSTEMD_AUTO_ENABLE:${PN} = "enable"
+
+# Add users
+inherit useradd
+
+USERADD_PACKAGES = "${PN}"
+
+GROUPADD_PARAM:${PN} = "--system gpio; --system spi; --system i2c; --system dialout"
+USERADD_PARAM:${PN} = "--system --create-home --groups gpio,spi,i2c,dialout --user-group meshtasticd"
 
 CFLAGS:remove = "-fcanon-prefix-map"
 CXXFLAGS:remove = "-fcanon-prefix-map"
@@ -55,13 +75,16 @@ CXXFLAGS:prepend = " -isystem ${STAGING_INCDIR}/c++/13.4.0 -isystem ${STAGING_IN
 
 # Add in our build patch. This is necessary because
 # platformio isn't picking up some of the yocto linker path locations
-SRC_URI += "file://yocto-link-fix.py file://config.yaml file://10-sx1262-usb.yaml file://99-usb-serial.rules"
+SRC_URI += "file://yocto-link-fix.py file://config.yaml file://98-gpio-pin.rules file://99-usb-serial.rules file://99-i2c.rules file://configure_radio.sh file://configure_radio.service"
 
-# Add our custom patch to the platformio build system.
 do_configure:append() {
+    # Due to the way that platformio assembles the linker parameters, we need this hack
+    # To add our own custom linker libraries. There's likely a better way to do this.
     cp ${WORKDIR}/yocto-link-fix.py ${S}/bin/yocto-link-fix.py
     sed -i "/^\\s*bin\\/platformio-custom.py/a\\        post:bin/yocto-link-fix.py" ${S}/platformio.ini
+    sed -i "/-lgpiod/a\\    -lulfius\n    -lorcania\n    -lssl\n    -lcrypto" ${S}/variants/native/portduino.ini
 }
+
 
 do_compile () {
     CC_BINARY="$(echo ${CC} | awk '{print $1}')"
@@ -81,7 +104,6 @@ do_compile () {
     export PLATFORMIO_BUILD_CACHE_DIR="${WORKDIR}/.platformio_build_cache"
 
     export PLATFORMIO_BUILD_FLAGS="--sysroot=${STAGING_DIR_TARGET} ${CXXFLAGS} ${CFLAGS} -I${STAGING_INCDIR} ${LDFLAGS} -L${STAGING_LIBDIR} -L${STAGING_DIR_TARGET}/lib -B${STAGING_LIBDIR}/${TARGET_SYS}/13.4.0"
-    export LDFLAGS="--sysroot=${STAGING_DIR_TARGET} ${LDFLAGS} -L${STAGING_LIBDIR}"
 
     # There's no yocto environment available in the meshtasticd build system,
     # but we can use the buildroot environment and the path hackery above to
@@ -101,11 +123,14 @@ do_install () {
     install -D -m 0755 ${S}/.pio/build/buildroot/meshtasticd ${D}${bindir}/meshtasticd
     install -D -m 0755 ${S}/bin/meshtasticd-start.sh ${D}${bindir}/meshtasticd-start.sh
 
+    # Install the radio configuration script
+    install -D -m 0755 ${WORKDIR}/configure_radio.sh ${D}${bindir}/configure_radio.sh
+
     # Install configuration files
     install -D -m 0644 ${WORKDIR}/config.yaml ${D}${sysconfdir}/meshtasticd/config.yaml
     install -d ${D}${sysconfdir}/meshtasticd/available.d
     cp -r ${S}/bin/config.d/* ${D}${sysconfdir}/meshtasticd/available.d/
-    install -D ${WORKDIR}/10-sx1262-usb.yaml ${D}${sysconfdir}/meshtasticd/config.d/10-sx1262-usb.yaml
+    cp ${S}/bin/config.d/lora-Adafruit-RFM9x.yaml ${D}${sysconfdir}/meshtasticd/config.d/
 
     # Optionally install service files (choose the proper scheme based on your init system)
     # For a SysV init script:
@@ -116,9 +141,19 @@ do_install () {
     # If you are using systemd, you might also install a service file:
     install -d ${D}${systemd_unitdir}/system
     install -D -m 0644 ${S}/bin/meshtasticd.service ${D}${systemd_unitdir}/system/meshtasticd.service
+    install -D -m 0644 ${WORKDIR}/configure_radio.service ${D}${systemd_unitdir}/system/configure_radio.service
 
     # Install the device udev rules
     install -d ${D}/etc/udev/rules.d
     install -D -m 0644 ${WORKDIR}/99-usb-serial.rules ${D}/etc/udev/rules.d/99-usb-serial.rules
+    install -D -m 0644 ${WORKDIR}/98-gpio-pin.rules ${D}/etc/udev/rules.d/98-gpio-pin.rules
+    install -D -m 0644 ${WORKDIR}/99-i2c.rules ${D}/etc/udev/rules.d/99-i2c.rules
+
+    # Web UI assets
+    install -m 0775 -o root -g meshtasticd -d ${D}${sysconfdir}/meshtasticd/ssl
+    install -m 0775 -o root -g meshtasticd -d -d ${D}${datadir}/meshtasticd/web
+    tar -xf ${WORKDIR}/build.tar -C ${D}${datadir}/meshtasticd/web
+    gunzip ${D}${datadir}/meshtasticd/web/*.gz
+    chown -R root:meshtasticd ${D}${datadir}/meshtasticd/web
 
 }
